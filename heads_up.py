@@ -126,10 +126,9 @@ def equity(hands, deck):
                     count[card.suit][hand] = 1
 
     for suit in count:
-        if count[suit] == {}:
-            for hand in hands:
-                combinations[hand] += math.comb(to_be_dealt, 5)
-        else:
+        if count[suit] != {}:
+            # if there is a royal flush on the board, it's a chop so it doesn't count for the equity
+
             for current_hand in count[suit]:
                 unblocked = True
                 for other_hand in count[suit]:
@@ -138,7 +137,8 @@ def equity(hands, deck):
                 if unblocked:
                     combinations[current_hand] += math.comb(to_be_dealt, 5-count[suit][current_hand])
 
-    print(count, combinations)
+    for hand in combinations:
+        hand.equity += combinations[hand]/math.comb(len(deck),to_be_dealt)
 
 
 def main():
@@ -155,7 +155,7 @@ def main():
     print(f'\n'
           f'{'':^7} Player 1  Player 2\n'
           f'{'Hand:':>7} {player1:<8}  {player2}\n'
-          f'Equity: {f'{player1.equity:.2f}%':<8}  {player2.equity:.2f}%')
+          f'Equity: {f'{player1.equity:.6f}%':<8}  {player2.equity:.6f}%')
 
 if __name__ == '__main__':
     main()
