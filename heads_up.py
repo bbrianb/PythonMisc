@@ -117,7 +117,7 @@ class Hand:
         return f'{f'{str(self)}':{format_spec}}'
 
 
-def equity(hands, deck):
+def equity(hands, deck, community_cards=None):
     to_be_dealt = 7 - len(hands[0])
     runouts = {hand: 0 for hand in hands}
 
