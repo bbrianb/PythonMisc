@@ -11,7 +11,7 @@ class Card:
         return str(self.rank) + self.suit
 
     def __eq__(self, other):
-        if isinstance(other, Rank):
+        if isinstance(other, Rank) or isinstance(other, int):
             return self.rank == other
         elif isinstance(other, str):
             return self.suit == other
@@ -24,6 +24,7 @@ class Card:
 class Rank:
     def __init__(self, rank: str):
         self.rankName = rank
+        self.rankNumber: int
 
         rank_dict = {'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
         if self.rankName in rank_dict:
@@ -37,6 +38,11 @@ class Rank:
     def __eq__(self, other):
         if isinstance(other, Rank):
             return self.rankNumber == other.rankNumber
+        elif isinstance(other, int):
+            if self.rankNumber == 14:
+                return other in (1, 14)
+            else:
+                return self.rankNumber == other
         else:
             return False
 
@@ -113,32 +119,74 @@ class Hand:
 
 def equity(hands, deck):
     to_be_dealt = 7 - len(hands[0])
-    combinations = {hand: 0 for hand in hands}
+    runouts = {hand: 0 for hand in hands}
 
-    # royal flush
-    count = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
-    for hand in hands:
-        for card in hand.cards:
-            if card >= 10:
-                if hand in count[card.suit]:
-                    count[card.suit][hand] += 1
-                else:
-                    count[card.suit][hand] = 1
+    # straight flush
+    low_end = 10
+    while low_end >= 1:
+        relevant_ranks = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
+        blockers = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
+        for hand in hands:
+            for card in hand.cards:
+                if card in range(low_end, low_end + 5):
+                    if hand in relevant_ranks[card.suit]:
+                        relevant_ranks[card.suit][hand].append(card.rank)
+                    else:
+                        relevant_ranks[card.suit][hand] = [card.rank]
 
-    for suit in count:
-        if count[suit] != {}:
-            # if there is a royal flush on the board, it's a chop so it doesn't count for the equity
+                elif card in range(low_end+5, low_end+10):
+                    if hand in blockers[card.suit]:
+                        blockers[card.suit][hand].append(card.rank)
+                    else:
+                        blockers[card.suit][hand] = [card.rank]
 
-            for current_hand in count[suit]:
-                unblocked = True
-                for other_hand in count[suit]:
-                    if other_hand != current_hand and count[suit][other_hand] > 0:
-                        unblocked = False
-                if unblocked:
-                    combinations[current_hand] += math.comb(to_be_dealt, 5-count[suit][current_hand])
+        for suit in relevant_ranks:
+            if relevant_ranks[suit] != {}:
+                for current_hand in relevant_ranks[suit]:
 
-    for hand in combinations:
-        hand.equity += combinations[hand]/math.comb(len(deck),to_be_dealt)
+                    connectors = 0
+                    for rank in range(low_end, low_end + 5):
+                        if rank in relevant_ranks[suit][current_hand]:
+                            connectors += 1
+                        else:
+                            break
+
+                    blocked = False
+
+                    for other_hand in relevant_ranks[suit]:
+                        if other_hand != current_hand and len(relevant_ranks[suit][other_hand]) > 0:
+                            blocked = True
+                            break
+
+                    other_blockers = []
+                    for hand in blockers[suit]:
+                        if hand != current_hand:
+                            other_blockers += blockers[suit][hand]
+
+
+                    blocking_connectors = 0
+                    for rank in range(low_end + 5, low_end + 10):
+                        if rank in other_blockers:
+                            blocking_connectors += 1
+                        else:
+                            break
+
+                    if blocking_connectors != 0 and blocking_connectors >= connectors:
+                        blocked = True
+
+                    # there's much more nuance
+                    if not blocked:
+                        drawing = 5 - len(relevant_ranks[suit][current_hand])
+                        runouts[current_hand] += math.comb(drawing, drawing) * math.comb(len(deck)-drawing, to_be_dealt-drawing)
+
+        for hand in runouts:
+            hand.equity += runouts[hand]/math.comb(len(deck), to_be_dealt)
+
+        low_end -= 1
+
+        print(relevant_ranks, blockers)
+    print(runouts)
+
 
 
 def main():
@@ -147,15 +195,16 @@ def main():
 
     deck.shuffle()
     player1, player2 = Hand(), Hand()
-    player1.new_cards([deck.deal(), deck.deal()])
-    player2.new_cards([deck.deal(), deck.deal()])
+    player1.new_cards([deck.deal('2', 's'), deck.deal('3', 's')])
+    player2.new_cards([deck.deal('8', 's'), deck.deal('9', 's')])
 
     equity((player1, player2), deck)
 
     print(f'\n'
           f'{'':^7} Player 1  Player 2\n'
           f'{'Hand:':>7} {player1:<8}  {player2}\n'
-          f'Equity: {f'{player1.equity:.6f}%':<8}  {player2.equity:.6f}%')
+          f'Equity: {f'{player1.equity:.2f}%':<8}  {player2.equity:.2f}%')
+
 
 if __name__ == '__main__':
     main()
