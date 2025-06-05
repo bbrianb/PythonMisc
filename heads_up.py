@@ -176,8 +176,6 @@ def equity(hands, deck, community_cards=None):
 
                                     needed_for_block.append(needed_for_straight[-1]+i+1)
 
-                                print(f'{low_end=}, {current_hand=}, {community_cards=}, {needed_for_straight=}, {consecutive=}, {needed_for_block=}')
-
                                 blocking_runouts = 0
 
                                 for other_hand in blockers[suit]:
@@ -191,20 +189,19 @@ def equity(hands, deck, community_cards=None):
                                     for rank in other_ranks:
                                         if rank in needed_for_block:
                                             blockers_found += 1
-                                            needed_for_block.remove(rank)
 
-                                    blocking_cards = len(needed_for_block)
+                                    print(low_end, needed_for_straight, needed_for_block)
 
-                                    print(f'{other_hand=}, {needed_for_block=} {blockers_found=}, {blockers_found == len(needed_for_block)}')
+                                    ranks_for_block = len(needed_for_block) - blockers_found
 
                                     if blockers_found == len(needed_for_block):
+                                        print(low_end, 'blocked')
                                         break
-                                    elif blocking_cards < to_be_dealt and nfs + blocking_cards < to_be_dealt:
-                                            print(to_be_dealt, nfs, blocking_cards)
-                                            blocking_runouts = math.comb(nfs, nfs) * math.comb(blocking_cards, blocking_cards) * math.comb(len(deck)-nfs-blocking_cards, to_be_dealt - nfs - blocking_cards)
-
-                                print(nfs, len(deck)-nfs, to_be_dealt-nfs)
-                                winning_runouts[current_hand] += math.comb(nfs, nfs) * math.comb(len(deck) - nfs, to_be_dealt - nfs) - blocking_runouts
+                                    elif ranks_for_block <= to_be_dealt and nfs + ranks_for_block <= to_be_dealt:
+                                        print(low_end, other_hand, math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block))
+                                        blocking_runouts += math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block)
+                                else:
+                                    winning_runouts[current_hand] += math.comb(nfs, nfs) * math.comb(len(deck) - nfs, to_be_dealt - nfs) - blocking_runouts
         for hand in winning_runouts:
             hand.equity += winning_runouts[hand]/math.comb(len(deck), to_be_dealt)
 
@@ -221,7 +218,7 @@ def main():
     deck.shuffle()
     player1, player2 = Hand(), Hand()
     player1.new_cards([deck.deal('2', 's'), deck.deal('3', 's')])
-    player2.new_cards([deck.deal('7', 's'), deck.deal('8', 's')])
+    player2.new_cards([deck.deal('9', 's'), deck.deal('8', 's')])
 
     equity((player1, player2), deck)
 
