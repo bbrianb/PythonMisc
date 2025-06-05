@@ -173,7 +173,6 @@ def equity(hands, deck, community_cards=None):
 
                                 # ts may be wrong
                                 for i in range(5 - consecutive):
-
                                     needed_for_block.append(needed_for_straight[-1]+i+1)
 
                                 blocking_runouts = 0
@@ -194,15 +193,19 @@ def equity(hands, deck, community_cards=None):
 
                                     ranks_for_block = len(needed_for_block) - blockers_found
 
-                                    cards_are_in_deck = True
+                                    cards_in_deck = True
                                     for rank in c:
+                                        for h in in_range[suit]:
+                                            if rank in in_range[suit][h]:
+                                                cards_in_deck = False
                                         for h in blockers[suit]:
-                                            if h != other_hand and rank in blockers[suit][h]:
-                                                cards_are_in_deck = False
+                                            if rank in blockers[suit][h]:
+                                                cards_in_deck = False
 
                                     if blockers_found == len(needed_for_block):
                                         break
-                                    elif ranks_for_block <= to_be_dealt and nfs + ranks_for_block <= to_be_dealt and cards_are_in_deck:
+                                    elif ranks_for_block <= to_be_dealt and nfs + ranks_for_block <= to_be_dealt and cards_in_deck:
+                                        print(low_end, math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block))
                                         blocking_runouts += math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block)
                                 else:
                                     winning_runouts[current_hand] += math.comb(nfs, nfs) * math.comb(len(deck) - nfs, to_be_dealt - nfs) - blocking_runouts
