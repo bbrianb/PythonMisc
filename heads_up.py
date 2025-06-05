@@ -74,7 +74,7 @@ class Deck:
     def shuffle(self):
         random.shuffle(self.cards)
 
-    def deal(self, rank: str = None, suit: str = None):
+    def deal(self, rank: str = None, suit: str = None) -> Card:
         if rank and suit:
             rank_wanted = Rank(rank)
             for i, card in enumerate(self.cards):
@@ -87,22 +87,11 @@ class Deck:
 class Hand:
     def __init__(self):
         self.cards = []
-        self.cardsBySuit = {'s': [], 'h': [], 'c': [], 'd': []}
-        self.cardsByRank = {}
         self.equity = 0
 
     def new_cards(self, new_cards):
         for card in new_cards:
             self.cards.append(card)
-            if card.suit not in self.cardsBySuit:
-                self.cardsBySuit[card.suit] = [card.rank]
-            else:
-                self.cardsBySuit[card.suit].append(card.rank)
-
-            if str(card.rank) not in self.cardsByRank:
-                self.cardsByRank[str(card.rank)] = [card.suit]
-            else:
-                self.cardsByRank[str(card.rank)].append(card.suit)
 
     def __len__(self):
         return len(self.cards)
@@ -120,64 +109,108 @@ class Hand:
 def equity(hands, deck, community_cards=None):
     if community_cards is None:
         community_cards = []
-    to_be_dealt = 7 - len(hands[0])
-    runouts = {hand: 0 for hand in hands}
+
+    to_be_dealt = 5 - len(community_cards)
+
+    winning_runouts = {hand: 0 for hand in hands}
 
     # straight flush
     low_end = 10
     while low_end >= 1:
         in_range = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
         blockers = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
+
         for hand in hands:
-            for card in hand.cards:
-                if card in range(low_end, low_end + 5):
-                    if hand in in_range[card.suit]:
-                        in_range[card.suit][hand].append(card.rank)
+            for rank in hand.cards:
+                if rank in range(low_end, low_end + 5):
+                    if hand in in_range[rank.suit]:
+                        in_range[rank.suit][hand].append(rank.rank)
                     else:
-                        in_range[card.suit][hand] = [card.rank]
+                        in_range[rank.suit][hand] = [rank.rank]
 
-                elif card in range(low_end+5, low_end+10):
-                    if hand in blockers[card.suit]:
-                        blockers[card.suit][hand].append(card.rank)
+                elif rank in range(low_end+5, low_end+9):
+                    if hand in blockers[rank.suit]:
+                        blockers[rank.suit][hand].append(rank.rank)
                     else:
-                        blockers[card.suit][hand] = [card.rank]
+                        blockers[rank.suit][hand] = [rank.rank]
 
-        for card in community_cards:
-            if card in range(low_end+5, low_end+10):
-                if 'community' in in_range[card.suit]:
-                    in_range[card.suit]['community'].append(card.rank)
-                else:
-                    in_range[card.suit]['community'] = [card.rank]
+        for suit in in_range:
+            in_range[suit]['community'] = []
+            blockers[suit]['community'] = []
+
+        for rank in community_cards:
+            if rank in range(low_end, low_end+5):
+                in_range[rank.suit]['community'].append(rank.rank)
+            elif rank in range(low_end+5, low_end+9):
+                blockers[rank.suit]['community'].append(rank.rank)
 
         for suit in in_range:
             if in_range[suit] != {}:
+
                 for current_hand in in_range[suit]:
                     if current_hand != 'community':
-                        connectors = 0
-                        for rank in range(low_end, low_end + 5):
-                            if rank in in_range[suit][current_hand] + in_range[suit]['community']:
-                                connectors += 1
-                            else:
-                                break
-
-                        blocked = False
 
                         for other_hand in in_range[suit]:
-                            if other_hand != current_hand and len(in_range[suit][other_hand]) > 0:
-                                blocked = True
+                            if other_hand not in (current_hand, 'community') and len(in_range[suit][other_hand]) > 0:
                                 break
+                        else:
+                            straight_so_far = in_range[suit][current_hand] + in_range[suit]['community']
+                            needed_for_straight = [i for i in range(low_end, low_end+5)]
+                            for rank in straight_so_far:
+                                if rank in needed_for_straight:
+                                    needed_for_straight.remove(rank)
 
-                        # add other blocks
-                        if not blocked:
-                            drawing = 5 - len(in_range[suit][current_hand])
-                            runouts[current_hand] += math.comb(drawing, drawing) * math.comb(len(deck)-drawing, to_be_dealt-drawing)
-                            print(low_end, current_hand, drawing, len(deck))
-        for hand in runouts:
-            hand.equity += runouts[hand]/math.comb(len(deck), to_be_dealt)
+                            nfs = len(needed_for_straight)
+                            if nfs <= to_be_dealt:
+                                consecutive = 1
+                                for i, rank in enumerate(needed_for_straight[:-1]):
+                                    if rank + 1 == needed_for_straight[i+1]:
+                                        consecutive += 1
+                                    else:
+                                        consecutive = 1
+
+                                needed_for_block = []
+
+                                # ts may be wrong
+                                for i in range(5 - consecutive):
+
+                                    needed_for_block.append(needed_for_straight[-1]+i+1)
+
+                                print(f'{low_end=}, {current_hand=}, {community_cards=}, {needed_for_straight=}, {consecutive=}, {needed_for_block=}')
+
+                                blocking_runouts = 0
+
+                                for other_hand in blockers[suit]:
+                                    if other_hand == 'community':
+                                        other_ranks = []
+                                    else:
+                                        other_ranks = blockers[suit][other_hand]
+                                    other_ranks += blockers[suit]['community']
+
+                                    blockers_found = 0
+                                    for rank in other_ranks:
+                                        if rank in needed_for_block:
+                                            blockers_found += 1
+                                            needed_for_block.remove(rank)
+
+                                    blocking_cards = len(needed_for_block)
+
+                                    print(f'{other_hand=}, {needed_for_block=} {blockers_found=}, {blockers_found == len(needed_for_block)}')
+
+                                    if blockers_found == len(needed_for_block):
+                                        break
+                                    elif blocking_cards < to_be_dealt and nfs + blocking_cards < to_be_dealt:
+                                            print(to_be_dealt, nfs, blocking_cards)
+                                            blocking_runouts = math.comb(nfs, nfs) * math.comb(blocking_cards, blocking_cards) * math.comb(len(deck)-nfs-blocking_cards, to_be_dealt - nfs - blocking_cards)
+
+                                print(nfs, len(deck)-nfs, to_be_dealt-nfs)
+                                winning_runouts[current_hand] += math.comb(nfs, nfs) * math.comb(len(deck) - nfs, to_be_dealt - nfs) - blocking_runouts
+        for hand in winning_runouts:
+            hand.equity += winning_runouts[hand]/math.comb(len(deck), to_be_dealt)
 
         low_end -= 1
 
-    print(runouts)
+    print(winning_runouts)
 
 
 
