@@ -171,7 +171,6 @@ def equity(hands, deck, community_cards=None):
 
                                 needed_for_block = []
 
-                                # ts may be wrong
                                 for i in range(5 - consecutive):
                                     needed_for_block.append(needed_for_straight[-1]+i+1)
 
