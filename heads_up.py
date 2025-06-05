@@ -186,19 +186,23 @@ def equity(hands, deck, community_cards=None):
                                     other_ranks += blockers[suit]['community']
 
                                     blockers_found = 0
+                                    c = needed_for_block.copy()
                                     for rank in other_ranks:
                                         if rank in needed_for_block:
                                             blockers_found += 1
-
-                                    print(low_end, needed_for_straight, needed_for_block)
+                                            c.remove(rank)
 
                                     ranks_for_block = len(needed_for_block) - blockers_found
 
+                                    cards_are_in_deck = True
+                                    for rank in c:
+                                        for h in blockers[suit]:
+                                            if h != other_hand and rank in blockers[suit][h]:
+                                                cards_are_in_deck = False
+
                                     if blockers_found == len(needed_for_block):
-                                        print(low_end, 'blocked')
                                         break
-                                    elif ranks_for_block <= to_be_dealt and nfs + ranks_for_block <= to_be_dealt:
-                                        print(low_end, other_hand, math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block))
+                                    elif ranks_for_block <= to_be_dealt and nfs + ranks_for_block <= to_be_dealt and cards_are_in_deck:
                                         blocking_runouts += math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block)
                                 else:
                                     winning_runouts[current_hand] += math.comb(nfs, nfs) * math.comb(len(deck) - nfs, to_be_dealt - nfs) - blocking_runouts
