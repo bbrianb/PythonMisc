@@ -1,9 +1,9 @@
 import random
-import math
+from enum import Enum, auto
 
 
 class Card:
-    def __init__(self, rank: str, suit: str):
+    def __init__(self, rank, suit: str):
         self.rank: Rank = Rank(rank)
         self.suit: str = suit
 
@@ -15,20 +15,33 @@ class Card:
             return self.rank == other
         elif isinstance(other, str):
             return self.suit == other
+        elif isinstance(other, Card):
+            return self.rank == other.rank and self.suit == other.suit
         else:
             return False
 
     def __ge__(self, other):
         return self.rank >= other
 
+    def __add__(self, other):
+        return Card(self.rank+other, self.suit)
+
 class Rank:
-    def __init__(self, rank: str):
-        self.rankName = rank
+    def __init__(self, rank):
+        if isinstance(rank, int):
+            name_dict = {10: 'T', 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 1: 'A'}
+            if rank in name_dict:
+                self.rankName = name_dict[rank]
+            else:
+                self.rankName = str(rank)
+        else:
+            self.rankName = rank
+
         self.rankNumber: int
 
-        rank_dict = {'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
-        if self.rankName in rank_dict:
-            self.rankNumber = rank_dict[self.rankName]
+        number_dict = {'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
+        if self.rankName in number_dict:
+            self.rankNumber = number_dict[self.rankName]
         else:
             self.rankNumber = int(self.rankName)
 
@@ -52,6 +65,9 @@ class Rank:
     def __hash__(self):
         return hash(self.rankName)
 
+    def __add__(self, other):
+        return self.rankNumber + other
+
 class Deck:
     def __init__(self):
         self.cards = []
@@ -74,24 +90,22 @@ class Deck:
     def shuffle(self):
         random.shuffle(self.cards)
 
-    def deal(self, rank: str = None, suit: str = None) -> Card:
+    def deal(self, hand, rank: str = None, suit: str = None) -> None:
         if rank and suit:
             rank_wanted = Rank(rank)
             for i, card in enumerate(self.cards):
                 if card == rank_wanted and card == suit:
-                    self.cards.pop(i)
-                    return card
+                    hand.cards.append(self.cards.pop(i))
+                    break
         else:
-            return self.cards.pop()
+            hand.cards.append(self.cards.pop())
 
 class Hand:
     def __init__(self):
         self.cards = []
         self.equity = 0
 
-    def new_cards(self, new_cards):
-        for card in new_cards:
-            self.cards.append(card)
+        self.winning_runouts = 0
 
     def __len__(self):
         return len(self.cards)
@@ -105,116 +119,94 @@ class Hand:
     def __format__(self, format_spec):
         return f'{f'{str(self)}':{format_spec}}'
 
+class HandStrength(Enum):
+    STRAIGHT_FLUSH = auto()
+    ROYAL_FLUSH = auto()
+
+class Claim:
+    def __init__(self, cards, hand_strength, belongs_to_hand):
+        self.cards = cards
+        self.hand_strength = hand_strength
+        self.belongs_to_hand = belongs_to_hand
+
+    def __repr__(self):
+        return str([self.cards, self.hand_strength, self.belongs_to_hand])
+
+    def __len__(self):
+        return len(self.cards)
+
 
 def equity(hands, deck, community_cards=None):
+    all_claims = get_claims(community_cards, deck, hands)
+    process_claims(all_claims)
+
+
+def process_claims(all_claims):
+    print(all_claims)
+    i = 0
+    while i in range(len(all_claims) - 1):
+        current_claim = all_claims[i]
+        j = 0
+        while j in range(len(all_claims[i + 1:])):
+            other_claim = all_claims[i + 1 + j]
+            overlapping = sum(1 for card in other_claim.cards if card in current_claim.cards)
+
+            # the same exact claim --> one claim has to lose, so it will get deleted
+            if overlapping == len(current_claim):
+
+                if current_claim.hand_strength == other_claim.hand_strength:
+                    if current_claim.hand_strength in (HandStrength.STRAIGHT_FLUSH, HandStrength.ROYAL_FLUSH):
+                        high_card = current_claim.cards[-1] + 1
+                        current_hand = current_claim.belongs_to_hand
+                        if high_card in current_hand.cards:
+                            all_claims.pop(i + 1 + j)
+                            print('ts worked')
+                            j -= 1
+                        else:
+                            all_claims.pop(i)
+                            print('ts worked')
+                            i -= 1
+                else:
+                    pass
+                    # the higher hand automatically beats out the other one every time
+            elif overlapping == len(current_claim) - 1:
+                pass
+
+            j += 1
+        i += 1
+    print(all_claims)
+
+
+def get_claims(community_cards, deck, hands):
     if community_cards is None:
         community_cards = []
-
     to_be_dealt = 5 - len(community_cards)
-
-    winning_runouts = {hand: 0 for hand in hands}
-
+    for hand in hands:
+        hand.winning_runouts = 0
+    all_claims = []
     # straight flush
-    low_end = 10
-    while low_end >= 1:
-        in_range = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
-        blockers = {'s': {}, 'h': {}, 'c': {}, 'd': {}}
+    for suit in ('s', 'h', 'c', 'd'):
+        for low_end in range(10, 0, -1):
+            current_straight = [Card(i, suit) for i in range(low_end, low_end + 5)]
 
-        for hand in hands:
-            for rank in hand.cards:
-                if rank in range(low_end, low_end + 5):
-                    if hand in in_range[rank.suit]:
-                        in_range[rank.suit][hand].append(rank.rank)
+            for current_hand in hands:
+                potential_claim = current_straight.copy()
+
+                for card in current_hand.cards + community_cards:
+                    if card in current_straight:
+                        potential_claim.remove(card)
+
+                for card in potential_claim:
+                    if card not in deck.cards:
+                        break
+                else:
+                    if low_end == 10:
+                        hand_strength = HandStrength.ROYAL_FLUSH
                     else:
-                        in_range[rank.suit][hand] = [rank.rank]
-
-                elif rank in range(low_end+5, low_end+9):
-                    if hand in blockers[rank.suit]:
-                        blockers[rank.suit][hand].append(rank.rank)
-                    else:
-                        blockers[rank.suit][hand] = [rank.rank]
-
-        for suit in in_range:
-            in_range[suit]['community'] = []
-            blockers[suit]['community'] = []
-
-        for rank in community_cards:
-            if rank in range(low_end, low_end+5):
-                in_range[rank.suit]['community'].append(rank.rank)
-            elif rank in range(low_end+5, low_end+9):
-                blockers[rank.suit]['community'].append(rank.rank)
-
-        for suit in in_range:
-            if in_range[suit] != {}:
-
-                for current_hand in in_range[suit]:
-                    if current_hand != 'community':
-
-                        for other_hand in in_range[suit]:
-                            if other_hand not in (current_hand, 'community') and len(in_range[suit][other_hand]) > 0:
-                                break
-                        else:
-                            straight_so_far = in_range[suit][current_hand] + in_range[suit]['community']
-                            needed_for_straight = [i for i in range(low_end, low_end+5)]
-                            for rank in straight_so_far:
-                                if rank in needed_for_straight:
-                                    needed_for_straight.remove(rank)
-
-                            nfs = len(needed_for_straight)
-                            if nfs <= to_be_dealt:
-                                consecutive = 1
-                                for i, rank in enumerate(needed_for_straight[:-1]):
-                                    if rank + 1 == needed_for_straight[i+1]:
-                                        consecutive += 1
-                                    else:
-                                        consecutive = 1
-
-                                needed_for_block = []
-
-                                for i in range(5 - consecutive):
-                                    needed_for_block.append(needed_for_straight[-1]+i+1)
-
-                                blocking_runouts = 0
-
-                                for other_hand in blockers[suit]:
-                                    if other_hand == 'community':
-                                        other_ranks = []
-                                    else:
-                                        other_ranks = blockers[suit][other_hand]
-                                    other_ranks += blockers[suit]['community']
-
-                                    blockers_found = 0
-                                    c = needed_for_block.copy()
-                                    for rank in other_ranks:
-                                        if rank in needed_for_block:
-                                            blockers_found += 1
-                                            c.remove(rank)
-
-                                    ranks_for_block = len(needed_for_block) - blockers_found
-
-                                    cards_in_deck = True
-                                    for rank in c:
-                                        for h in in_range[suit]:
-                                            if rank in in_range[suit][h]:
-                                                cards_in_deck = False
-                                        for h in blockers[suit]:
-                                            if rank in blockers[suit][h]:
-                                                cards_in_deck = False
-
-                                    if blockers_found == len(needed_for_block):
-                                        break
-                                    elif ranks_for_block <= to_be_dealt and nfs + ranks_for_block <= to_be_dealt and cards_in_deck:
-                                        print(low_end, math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block))
-                                        blocking_runouts += math.comb(nfs, nfs) * math.comb(ranks_for_block, ranks_for_block) * math.comb(len(deck)-nfs-ranks_for_block, to_be_dealt - nfs - ranks_for_block)
-                                else:
-                                    winning_runouts[current_hand] += math.comb(nfs, nfs) * math.comb(len(deck) - nfs, to_be_dealt - nfs) - blocking_runouts
-        for hand in winning_runouts:
-            hand.equity += winning_runouts[hand]/math.comb(len(deck), to_be_dealt)
-
-        low_end -= 1
-
-    print(winning_runouts)
-
+                        hand_strength = HandStrength.STRAIGHT_FLUSH
+                    if len(potential_claim) <= to_be_dealt and len(potential_claim) < 5:
+                        all_claims.append(Claim(potential_claim, hand_strength, current_hand))
+    return all_claims
 
 
 def main():
@@ -223,8 +215,10 @@ def main():
 
     deck.shuffle()
     player1, player2 = Hand(), Hand()
-    player1.new_cards([deck.deal('2', 's'), deck.deal('3', 's')])
-    player2.new_cards([deck.deal('9', 's'), deck.deal('8', 's')])
+    deck.deal(player1, '2', 's')
+    deck.deal(player1, '3', 's')
+    deck.deal(player2, '7', 's')
+    deck.deal(player2)
 
     equity((player1, player2), deck)
 
