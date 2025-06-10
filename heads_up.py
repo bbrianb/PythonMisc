@@ -1,5 +1,6 @@
 import random
 from enum import Enum, auto
+import math
 
 
 class Card:
@@ -14,7 +15,10 @@ class Card:
         if isinstance(other, Rank) or isinstance(other, int):
             return self.rank == other
         elif isinstance(other, str):
-            return self.suit == other
+            if other.islower():
+                return self.suit == other
+            else:
+                return self.rank == other
         elif isinstance(other, Card):
             return self.rank == other.rank and self.suit == other.suit
         else:
@@ -56,6 +60,8 @@ class Rank:
                 return other in (1, 14)
             else:
                 return self.rankNumber == other
+        elif isinstance(other, str):
+            return self.rankName == other
         else:
             return False
 
@@ -67,6 +73,11 @@ class Rank:
 
     def __add__(self, other):
         return self.rankNumber + other
+
+    def __gt__(self, other):
+        if isinstance(other, Rank):
+            return self.rankNumber > other.rankNumber
+        return False
 
 class Deck:
     def __init__(self):
@@ -100,6 +111,9 @@ class Deck:
         else:
             hand.cards.append(self.cards.pop())
 
+    def count(self, thing):
+        return self.cards.count(thing)
+
 class Hand:
     def __init__(self):
         self.cards = []
@@ -124,63 +138,82 @@ class HandStrength(Enum):
     ROYAL_FLUSH = auto()
 
 class Claim:
-    def __init__(self, cards, hand_strength, belongs_to_hand):
+    def __init__(self, cards, hand_strength, belongs_to_hand, high_card_info):
         self.cards = cards
-        self.hand_strength = hand_strength
-        self.belongs_to_hand = belongs_to_hand
+        self.handStrength = hand_strength
+        self.belongsToHand = belongs_to_hand
+        self.highCardInfo: list[Rank] = high_card_info
+        self.blocked = 0
 
     def __repr__(self):
-        return str([self.cards, self.hand_strength, self.belongs_to_hand])
+        return str([self.cards, self.handStrength, self.belongsToHand, self.highCardInfo, self.blocked])
 
     def __len__(self):
         return len(self.cards)
 
 
 def equity(hands, deck, community_cards=None):
-    all_claims = get_claims(community_cards, deck, hands)
-    process_claims(all_claims)
+    if community_cards is None:
+        community_cards = []
+    to_be_dealt = 5 - len(community_cards)
+
+    all_claims = get_claims(community_cards, deck, hands, to_be_dealt)
+    process_claims(all_claims, deck, to_be_dealt)
 
 
-def process_claims(all_claims):
+def process_claims(all_claims, deck, to_be_dealt):
     print(all_claims)
     i = 0
     while i in range(len(all_claims) - 1):
         current_claim = all_claims[i]
         j = 0
         while j in range(len(all_claims[i + 1:])):
-            other_claim = all_claims[i + 1 + j]
+            k = i + 1 + j
+            other_claim = all_claims[k]
             overlapping = sum(1 for card in other_claim.cards if card in current_claim.cards)
 
             # the same exact claim --> one claim has to lose, so it will get deleted
             if overlapping == len(current_claim):
 
-                if current_claim.hand_strength == other_claim.hand_strength:
-                    if current_claim.hand_strength in (HandStrength.STRAIGHT_FLUSH, HandStrength.ROYAL_FLUSH):
-                        high_card = current_claim.cards[-1] + 1
-                        current_hand = current_claim.belongs_to_hand
-                        if high_card in current_hand.cards:
-                            all_claims.pop(i + 1 + j)
-                            print('ts worked')
+                if current_claim.handStrength == other_claim.handStrength:
+                    if current_claim.handStrength in (HandStrength.STRAIGHT_FLUSH, HandStrength.ROYAL_FLUSH):
+                        if current_claim.highCardInfo[0] > other_claim.highCardInfo[0]:
+                            all_claims.pop(k)
                             j -= 1
                         else:
                             all_claims.pop(i)
-                            print('ts worked')
                             i -= 1
                 else:
                     pass
                     # the higher hand automatically beats out the other one every time
-            elif overlapping == len(current_claim) - 1:
-                pass
+
+            elif overlapping != 0:
+                if current_claim.handStrength == other_claim.handStrength:
+                    if current_claim.handStrength in (HandStrength.STRAIGHT_FLUSH, HandStrength.ROYAL_FLUSH):
+                        if current_claim.highCardInfo[0] > other_claim.highCardInfo[0]:
+                            stronger = i
+                            weaker = k
+                        else:
+                            stronger = k
+                            weaker = i
+
+                        weaker_length = len(all_claims[weaker])
+                        needed_for_block = len(all_claims[stronger]) - overlapping
+                        new_deck = len(deck) - weaker_length - needed_for_block
+                        remaining = max(to_be_dealt - weaker_length - needed_for_block, 0)
+
+                        if needed_for_block <= to_be_dealt - weaker_length:
+                            all_claims[weaker].blocked += math.comb(weaker_length, weaker_length) * math.comb(needed_for_block, needed_for_block) * math.comb(new_deck, remaining)
+                            print(all_claims[weaker], all_claims[stronger], overlapping)
+                else:
+                    pass
 
             j += 1
         i += 1
     print(all_claims)
 
 
-def get_claims(community_cards, deck, hands):
-    if community_cards is None:
-        community_cards = []
-    to_be_dealt = 5 - len(community_cards)
+def get_claims(community_cards, deck, hands, to_be_dealt):
     for hand in hands:
         hand.winning_runouts = 0
     all_claims = []
@@ -205,7 +238,7 @@ def get_claims(community_cards, deck, hands):
                     else:
                         hand_strength = HandStrength.STRAIGHT_FLUSH
                     if len(potential_claim) <= to_be_dealt and len(potential_claim) < 5:
-                        all_claims.append(Claim(potential_claim, hand_strength, current_hand))
+                        all_claims.append(Claim(potential_claim, hand_strength, current_hand, [Rank(low_end+4)]))
     return all_claims
 
 
