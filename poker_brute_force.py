@@ -1,6 +1,7 @@
 from random import shuffle
 from itertools import combinations
 from enum import Enum, auto
+from time import perf_counter
 
 class Rank:
     def __init__(self, rank):
@@ -28,8 +29,16 @@ class Rank:
     def __eq__(self, other):
         if isinstance(other, Rank):
             return self.rankName == other.rankName
+        elif isinstance(other, int):
+            return self.rankNumber == other
         else:
             return False
+
+    def __add__(self, other):
+        return self.rankNumber + other
+
+    def __hash__(self):
+        return hash(self.rankName)
 
 class Card:
     def __init__(self, rank, suit: str):
@@ -45,7 +54,7 @@ class Card:
         return str(self.rank) + self.suit
 
     def __eq__(self, other):
-        if isinstance(other, Rank):
+        if isinstance(other, Rank) or isinstance(other, int):
             return self.rank == other
         elif isinstance(other, str):
             return self.suit == other
@@ -53,6 +62,12 @@ class Card:
             return self.rank == other.rank and self.suit == other.suit
         else:
             return False
+
+    def __add__(self, other):
+        return self.rank + other
+
+    def __hash__(self):
+        return hash((self.rank, self.suit))
 
 class Player:
     def __init__(self):
@@ -117,41 +132,44 @@ class Deck:
 
     def __len__(self) -> int: return len(self.cards)
 
-def get_hand_strength(board: list[Card], players: list[Player]) -> None:
-    print(board)
+def prep_players(current_board, players: list[Player]):
+    to_be_dealt = 5 - len(current_board)
 
     for current_player in players:
-        current_player.tempAvailableCards = current_player + board
+        current_player.availableCards = current_player + current_board
+        current_player.cardsNeeded = {}
+
+    for suit in Deck().suits:
+        for low_end in range(10, 0, -1):
+            original_straight = [Card(i, suit) for i in range(low_end, low_end + 5)]
+
+            for current_player in players:
+                potential_straight = original_straight.copy()
+
+                for card in current_player.availableCards:
+                    if card in potential_straight:
+                        potential_straight.remove(card)
+
+
+                if len(potential_straight) < 5 and len(potential_straight) <= to_be_dealt:
+                    current_player.cardsNeeded[tuple(potential_straight)] = [None, original_straight[-1].rank]
+
+                    if original_straight[0] == 10:
+                        current_player.cardsNeeded[tuple(potential_straight)][0] = HandStrength.ROYAL_FLUSH
+                    else:
+                        current_player.cardsNeeded[tuple(potential_straight)][0] = HandStrength.STRAIGHT_FLUSH
+
+    for current_player in players:
+        print(current_player.cardsNeeded)
+
+
+
+def get_hand_strengths(rest_of_board: list[Card], players: list[Player]) -> None:
+    for current_player in players:
         current_player.tempHandStrength = None
 
     hands_made = 0
     player_count = len(players)
-
-    for suit in Deck().suits:
-        for low_end in range(10, 0, -1):
-            current_straight = [Card(i, suit) for i in range(low_end, low_end + 5)]
-
-            for current_player in players:
-                potential_straight = current_straight.copy()
-
-                cards_found = 0
-                for card in current_player.tempAvailableCards:
-                    if card in potential_straight:
-                        cards_found += 1
-
-                    if cards_found == 5:
-                        if low_end == 10:
-                            current_player.tempHandStrength = HandStrength.ROYAL_FLUSH
-                        else:
-                            current_player.tempHandStrength = HandStrength.STRAIGHT_FLUSH
-
-                        current_player.tempHighCardInfo = [Rank(low_end+4)]
-
-                        hands_made += 1
-
-    if hands_made < player_count:
-        # quads
-        pass
 
 def main():
     deck = Deck()
@@ -166,9 +184,9 @@ def main():
     cheating = True
     if cheating:
         deck.deal(player1, 'T', 's')
-        deck.deal(player1, 'T', 'h')
+        deck.deal(player1, 'J', 's')
         deck.deal(player2, 'T', 'c')
-        deck.deal(player2, 'T', 'd')
+        deck.deal(player2, 'J', 'c')
     else:
         for _ in range(2):
             for player in players:
@@ -182,8 +200,13 @@ def main():
     for rest_of_board in combinations(deck.cards, 5):
         rest_of_boards.append(rest_of_board)
 
-    for rest_of_board in rest_of_boards[:1]:
-        get_hand_strength(current_board + list(rest_of_board), players)
+    prep_players(current_board, players)
+
+    for rest_of_board in rest_of_boards:
+        start = perf_counter()
+        get_hand_strengths(list(rest_of_board), players)
+        stop = perf_counter()
+        print(stop - start)
 
 if __name__ == '__main__':
     main()
