@@ -127,20 +127,20 @@ def get_hand_and_draws(cards):
     analysis = find_5_card_hand(analysis)
     analysis = finalize_analysis(analysis)
 
-    return (analysis.handName, analysis.highCardInfo, analysis.fiveCardHand), analysis.draws_dict
+    return (analysis.handName, analysis.tempHighCardInfo, analysis.fiveCardHand), analysis.draws_dict
 
 
 def check_pair_etc(analysis):
     for card in analysis.cards:
         number_of_matching_cards = analysis.cards.count(card)
 
-        if card.cardValue not in analysis.highCardInfo:
+        if card.cardValue not in analysis.tempHighCardInfo:
             if number_of_matching_cards >= 2:
                 hand_dict = {2: HandStrength.PAIR, 3: HandStrength.THREE_OF_A_KIND, 4: HandStrength.FOUR_OF_A_KIND}
                 new_hand_name = hand_dict[number_of_matching_cards]
                 if analysis.handName is None or new_hand_name.value > analysis.handName.value:
                     analysis.handName = new_hand_name
-                    analysis.highCardInfo.append(card.cardValue)
+                    analysis.tempHighCardInfo.append(card.cardValue)
                     if number_of_matching_cards == 2:
                         analysis.numberOfPairs += 1
                     elif number_of_matching_cards == 3:
@@ -180,15 +180,15 @@ def check_straight_etc(analysis):
             analysis, straight_matches, straight_flush_matches, straight_absences, straight_flush_absences = check_straight_instance(analysis,
                                                                                                    possible_straight)
             if straight_flush_matches == 5:
-                analysis.highCardInfo = [possible_straight[-1]]
+                analysis.tempHighCardInfo = [possible_straight[-1]]
                 add_draw(analysis, HandStrength.STRAIGHT, None)
-                if analysis.highCardInfo[0] == 14:
+                if analysis.tempHighCardInfo[0] == 14:
                     analysis.handName = HandStrength.ROYAL_FLUSH
                     add_draw(analysis, HandStrength.STRAIGHT_FLUSH, None)
                 else:
                     analysis.handName = HandStrength.STRAIGHT_FLUSH
             elif straight_matches == 5:
-                analysis.highCardInfo = [possible_straight[-1]]
+                analysis.tempHighCardInfo = [possible_straight[-1]]
                 analysis.handName = HandStrength.STRAIGHT
 
             add_straight_draws(analysis, possible_straight, straight_absences, straight_flush_absences,
@@ -202,10 +202,10 @@ def add_straight_draws(analysis, possible_straight, straight_absences, straight_
                        straight_matches):
     if straight_flush_matches == 4:
         addition = Card(analysis.flushSuit, straight_flush_absences[0])
-        if not analysis.highCardInfo:
-            analysis.highCardInfo = [0]
+        if not analysis.tempHighCardInfo:
+            analysis.tempHighCardInfo = [0]
         if (analysis.handName not in [HandStrength.STRAIGHT_FLUSH, HandStrength.ROYAL_FLUSH]
-                or addition.numberValue > analysis.highCardInfo[0]
+                or addition.numberValue > analysis.tempHighCardInfo[0]
         ):
             if possible_straight[-1] == 14:
                 add_draw(analysis, HandStrength.ROYAL_FLUSH, addition)
@@ -213,10 +213,10 @@ def add_straight_draws(analysis, possible_straight, straight_absences, straight_
                 add_draw(analysis, HandStrength.STRAIGHT_FLUSH, addition)
     if straight_matches == 4:
         addition = straight_absences[0]
-        if not analysis.highCardInfo:
-            analysis.highCardInfo = [0]
+        if not analysis.tempHighCardInfo:
+            analysis.tempHighCardInfo = [0]
         if (analysis.handName not in [HandStrength.STRAIGHT, HandStrength.STRAIGHT_FLUSH, HandStrength.ROYAL_FLUSH]
-                or Card('', addition).numberValue > analysis.highCardInfo[0]
+                or Card('', addition).numberValue > analysis.tempHighCardInfo[0]
         ):
             add_draw(analysis, HandStrength.STRAIGHT, addition)
 
@@ -271,28 +271,28 @@ def find_high_card(analysis):
 
 
 def find_pair(analysis):
-    find_matching_cards(analysis, 2, analysis.highCardInfo[0])
-    add_draw(analysis, HandStrength.THREE_OF_A_KIND, analysis.highCardInfo[0])
+    find_matching_cards(analysis, 2, analysis.tempHighCardInfo[0])
+    add_draw(analysis, HandStrength.THREE_OF_A_KIND, analysis.tempHighCardInfo[0])
     for c in analysis.cards:
-        if c != analysis.highCardInfo[0]:
+        if c != analysis.tempHighCardInfo[0]:
             add_draw(analysis, HandStrength.TWO_PAIR, c.cardValue)
 
 
 def find_two_pairs(analysis):
     analysis.handName = HandStrength.TWO_PAIR
     if analysis.numberOfPairs == 3:
-        analysis.highCardInfo.remove(min(analysis.highCardInfo))
-    high_pair = max(analysis.highCardInfo)
-    low_pair = min(analysis.highCardInfo)
-    analysis.highCardInfo = [high_pair, low_pair]
-    for pairValue in analysis.highCardInfo:
+        analysis.tempHighCardInfo.remove(min(analysis.tempHighCardInfo))
+    high_pair = max(analysis.tempHighCardInfo)
+    low_pair = min(analysis.tempHighCardInfo)
+    analysis.tempHighCardInfo = [high_pair, low_pair]
+    for pairValue in analysis.tempHighCardInfo:
         find_matching_cards(analysis, 2, pairValue)
         add_draw(analysis, HandStrength.FULL_HOUSE, pairValue)
 
 
 def find_three_of_kind(analysis):
-    find_matching_cards(analysis, 3, analysis.highCardInfo[0])
-    add_draw(analysis, HandStrength.FOUR_OF_A_KIND, analysis.highCardInfo[0])
+    find_matching_cards(analysis, 3, analysis.tempHighCardInfo[0])
+    add_draw(analysis, HandStrength.FOUR_OF_A_KIND, analysis.tempHighCardInfo[0])
 
 
 def find_flush(analysis):
@@ -306,7 +306,7 @@ def find_full_house(analysis):
     analysis.handName = HandStrength.FULL_HOUSE
     pairs = []
     three_of_kinds = []
-    for value in analysis.highCardInfo:
+    for value in analysis.tempHighCardInfo:
         if analysis.cards.count(value) == 3:
             three_of_kinds.append(value)
         else:
@@ -321,18 +321,18 @@ def find_full_house(analysis):
     add_draw(analysis, HandStrength.FOUR_OF_A_KIND, the_three_of_kind)
     if the_pair > the_three_of_kind:
         add_draw(analysis, HandStrength.FULL_HOUSE, the_pair)
-    analysis.highCardInfo = three_of_kinds + pairs
+    analysis.tempHighCardInfo = three_of_kinds + pairs
 
 
 def find_four_of_kind(analysis, the_fok):
-    for value in analysis.highCardInfo:
+    for value in analysis.tempHighCardInfo:
         if analysis.cards.count(value) == 4:
             the_fok = value
     find_matching_cards(analysis, 4, the_fok)
 
 
 def find_straight(analysis, flush=False):
-    straight_high_card = int(analysis.highCardInfo[0])
+    straight_high_card = int(analysis.tempHighCardInfo[0])
     current_value = straight_high_card
 
     while current_value > straight_high_card - 5 and current_value > 1:
@@ -375,17 +375,17 @@ def finalize_analysis(analysis):
     while len(analysis.fiveCardHand) < 5:
         move_card(analysis, analysis.cards.index(max(analysis.cards)))
 
-    if not analysis.highCardInfo or analysis.highCardInfo == [0]:
-        analysis.highCardInfo = [max(card.numberValue for card in analysis.fiveCardHand)]
+    if not analysis.tempHighCardInfo or analysis.tempHighCardInfo == [0]:
+        analysis.tempHighCardInfo = [max(card.numberValue for card in analysis.fiveCardHand)]
 
     if analysis.handName == HandStrength.ROYAL_FLUSH:
-        analysis.highCardInfo = []
+        analysis.tempHighCardInfo = []
     if analysis.handName is None:
         analysis.handName = HandStrength.HIGH_CARD
 
     # turn int into str
-    if len(analysis.highCardInfo) == 1 and isinstance(analysis.highCardInfo[0], int):
-        analysis.highCardInfo = [get_card_value(analysis.highCardInfo[0])]
+    if len(analysis.tempHighCardInfo) == 1 and isinstance(analysis.tempHighCardInfo[0], int):
+        analysis.tempHighCardInfo = [get_card_value(analysis.tempHighCardInfo[0])]
 
     if analysis.handName not in analysis.draws_dict:
         add_draw(analysis, analysis.handName, None)

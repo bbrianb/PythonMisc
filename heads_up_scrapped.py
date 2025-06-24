@@ -285,9 +285,9 @@ def process_claims(all_claims, hands, deck, to_be_dealt):
 
 
 def determine_stronger_hand(current_claim, other_claim):
-    if current_claim.handStrength == other_claim.handStrength:
-        return compare_high_cards(current_claim.highCardInfo, other_claim.highCardInfo)
-    elif current_claim.handStrength.value > other_claim.handStrength.value:
+    if current_claim.tempHandStrength == other_claim.tempHandStrength:
+        return compare_high_cards(current_claim.tempHighCardInfo, other_claim.tempHighCardInfo)
+    elif current_claim.tempHandStrength.value > other_claim.tempHandStrength.value:
         return 'current'
     else:
         return 'other'
