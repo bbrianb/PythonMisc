@@ -34,10 +34,11 @@ class Deck:
         return len(self.cards)
 
 class Card:
-    def __init__(self, rank, suit: str = None) -> None:
+    def __init__(self, rank, suit) -> None:
         self.rankName: str
         self.rankNumber: int
         self.suit: str = suit
+        self.fullCompare = False
 
         numbers = {'A': 11, 'T': 10, 'J': 10, 'Q': 10, 'K': 10}
         names = {11: 'A', 10: 'T'}
@@ -70,6 +71,11 @@ class Card:
                     return self.rankName == other
             else:
                 return False
+        elif isinstance(other, Card):
+            if self.fullCompare or other.fullCompare:
+                return self.rankNumber == other.rankNumber and self.suit == other.suit
+            else:
+                return self.rankNumber == other.rankNumber
         else:
             return False
 
@@ -108,7 +114,13 @@ def main() -> None:
         else:
             deck.cards.append(dealer.pop())
 
-            # find dealer's odds
+            odds_dict = get_odds_dict(dealer, deck)
+            print(odds_dict)
+
+
+def get_odds_dict(current_cards: list[Card], deck: Deck) -> dict:
+    odds_dict = dict.fromkeys(range(2, 22), 0.)
+    return odds_dict
 
 
 def blackjack_sum(cards: list[Card]) -> tuple[int, bool]:
