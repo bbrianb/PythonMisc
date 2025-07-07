@@ -56,7 +56,10 @@ class Card:
             self.rankNumber = rank
 
     def __repr__(self) -> str:
-        return self.rankName + self.suit
+        if self.suit is None:
+            return self.rankName
+        else:
+            return self.rankName + self.suit
 
     def __eq__(self, other) -> bool:
         if isinstance(other, str):
@@ -105,27 +108,7 @@ def main() -> None:
         else:
             deck.cards.append(dealer.pop())
 
-            dealer_odds = {}
-
-            new_card_value = 11
-
-            while new_card_value > 1:
-                new_card = Card(new_card_value)
-
-                total, soft = blackjack_sum(dealer + [new_card])
-
-                if total <= 21:
-                    dealer_odds[total] = deck.count(new_card.rankName)/len(deck)
-
-                    print(f'{new_card.rankName} {f'({total}{', soft' if soft else ''})':<10} {deck.count(new_card.rankName)/len(deck):.2f}%')
-
-                    if total < 17:
-                        # recur
-                        pass
-
-                new_card_value -= 1
-
-            print(dealer_odds)
+            # find dealer's odds
 
 
 def blackjack_sum(cards: list[Card]) -> tuple[int, bool]:
@@ -151,14 +134,6 @@ def print_cards(cards: list[Card]) -> str:
     for card in cards:
         output += str(card) + ' '
     return output[:-1]
-
-def recur(cards: list[Card]):
-    new_card_value = 11
-    while new_card_value > 1:
-        new_card = Card(new_card_value)
-        total, soft = blackjack_sum(cards + [new_card])
-        if total <= 21:
-            pass
 
 if __name__ == '__main__':
     main()
