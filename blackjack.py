@@ -18,6 +18,10 @@ class Deck:
             for i, card in enumerate(self.cards):
                 if card == rank and card == suit:
                     return self.cards.pop(i)
+        elif rank:
+            for i, card in enumerate(self.cards):
+                if card == rank:
+                    return self.cards.pop(i)
         else:
             return self.cards.pop()
 
@@ -34,23 +38,25 @@ class Deck:
         return len(self.cards)
 
 class Card:
-    def __init__(self, rank, suit) -> None:
+    def __init__(self, rank=None, suit=None) -> None:
         self.rankName: str
         self.rankNumber: int
         self.suit: str = suit
-        self.fullCompare = False
+        self.fullCompare: bool = False
+        if suit is None:
+            self.suit = ''
 
-        numbers = {'A': 11, 'T': 10, 'J': 10, 'Q': 10, 'K': 10}
-        names = {11: 'A', 10: 'T'}
+        self.numbers_dict: dict = {'A': 11, 'T': 10, 'J': 10, 'Q': 10, 'K': 10}
+        self.names_dict: dict = {11: 'A', 10: 'T'}
 
-        if rank in numbers:
+        if rank in self.numbers_dict:
             self.rankName = rank
-            self.rankNumber = numbers[self.rankName]
+            self.rankNumber = self.numbers_dict[self.rankName]
         elif isinstance(rank, str):
             self.rankName = rank
             self.rankNumber = int(self.rankName)
-        elif rank in names:
-            self.rankName = names[rank]
+        elif rank in self.names_dict:
+            self.rankName = self.names_dict[rank]
             self.rankNumber = rank
         else:
             self.rankName = str(rank)
@@ -70,12 +76,7 @@ class Card:
                 else:
                     return self.rankName == other
             else:
-                return False
-        elif isinstance(other, Card):
-            if self.fullCompare or other.fullCompare:
-                return self.rankNumber == other.rankNumber and self.suit == other.suit
-            else:
-                return self.rankNumber == other.rankNumber
+                return self.suit == other
         else:
             return False
 
@@ -92,10 +93,9 @@ def main() -> None:
     player: list[Card] = []
     dealer: list[Card] = []
 
-    player.append(deck.deal())
-    dealer.append(deck.deal())
-    player.append(deck.deal())
-    dealer.append(deck.deal())
+    player.append(deck.deal('T', 'h'))
+    dealer.append(deck.deal('T', 's'))
+    player.append(deck.deal('6', 'd'))
 
     player_total, soft = blackjack_sum(player)
 
@@ -115,13 +115,47 @@ def main() -> None:
             deck.cards.append(dealer.pop())
 
             odds_dict = get_odds_dict(dealer, deck)
-            print(odds_dict)
+            print(odds_dict, sum(odds_dict.values()))
 
+def get_odds_dict(input_cards: list[Card], deck: Deck, space='') -> dict:
+    output_odds: dict = {}
+    next_card_rank: int = 11
+    while next_card_rank > 1:
+        next_card_rank_name: str = Card(next_card_rank).rankName
+        next_card: Card = deck.deal(next_card_rank_name)
+        current_odds: float = (deck.count(next_card_rank_name) + 1)/(len(deck) + 1)
 
-def get_odds_dict(current_cards: list[Card], deck: Deck) -> dict:
-    odds_dict = dict.fromkeys(range(2, 22), 0.)
-    return odds_dict
+        if next_card:
+            current_cards = input_cards + [next_card]
 
+            total, _ = blackjack_sum(current_cards)
+
+            if total < 17:
+                next_odds = get_odds_dict(current_cards, deck, space+'   ')
+
+                # odds of getting both the current card and the one before
+                adjusted_odds: dict = {}
+                for key in next_odds:
+                    adjusted_odds[key] = current_odds * next_odds[key]
+
+                for key in adjusted_odds:
+                    if key in output_odds:
+                        output_odds[key] += adjusted_odds[key]
+                    else:
+                        output_odds[key] = adjusted_odds[key]
+
+                # print(current_cards, total, current_odds, next_odds, adjusted_odds, output_odds)
+            elif total <= 21:
+                    output_odds[total] = current_odds
+            else:
+                if 'bust' in output_odds:
+                    output_odds['bust'] += current_odds
+                else:
+                    output_odds['bust'] = current_odds
+
+            deck.cards.append(next_card)
+        next_card_rank -= 1
+    return output_odds
 
 def blackjack_sum(cards: list[Card]) -> tuple[int, bool]:
     output = 0
