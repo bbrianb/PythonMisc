@@ -92,15 +92,18 @@ def main() -> None:
     player: list[Card] = []
     dealer: list[Card] = []
 
-    player.append(deck.deal('T', 'h'))
-    dealer.append(deck.deal('T', 's'))
-    player.append(deck.deal('6', 'd'))
+    player.append(deck.deal())
+    dealer.append(deck.deal())
+    player.append(deck.deal())
 
     player_total, soft = blackjack_sum(player)
 
     print(f'Dealer  {dealer[0]}\n'
           f'Player  {print_cards(player)}  {player_total}{' (soft)' if soft else ''}')
+
+    dealer.append(deck.deal())
     dealer_total, _ = blackjack_sum(dealer)
+
     if dealer_total == 21:
         print('Dealer has blackjack')
         if player_total == 21:
@@ -114,14 +117,14 @@ def main() -> None:
             # don't forget to put cards back
             deck.cards.append(dealer.pop())
 
-            odds_dict = {'bust': [False, 0]}
+            odds_dict = {'bust': [False, 0], 0: None}
             print('\n1 Card')
             for next_rank in range(11, 1, -1):
                 # have to put this card back
                 next_rank_name = Card(next_rank).rankName
 
                 next_card = deck.deal(next_rank_name)
-                total, soft = blackjack_sum(player + [next_card])
+                total, soft = blackjack_sum(dealer + [next_card])
                 if total <= 21:
                     odds_dict[total] = [soft, deck.count(next_rank_name)+1]
                 else:
