@@ -114,7 +114,7 @@ def main() -> None:
         if player_total == 21:
             print('Player has blackjack')
         else:
-            # don't forget to put cards back
+            # remember to put cards back
             deck.cards.append(dealer.pop())
 
             odds_dict: dict = get_odds_dict(dealer, deck)
