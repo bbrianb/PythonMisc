@@ -22,8 +22,7 @@ class Deck:
             for i, card in enumerate(self.cards):
                 if card == rank:
                     return self.cards.pop(i)
-        else:
-            return self.cards.pop()
+        return self.cards.pop()
 
     def count(self, item):
         return self.cards.count(item)
@@ -93,15 +92,18 @@ def main() -> None:
     player: list[Card] = []
     dealer: list[Card] = []
 
-    player.append(deck.deal('T', 'h'))
-    dealer.append(deck.deal('T', 's'))
-    player.append(deck.deal('6', 'd'))
+    player.append(deck.deal())
+    dealer.append(deck.deal())
+    player.append(deck.deal())
 
     player_total, soft = blackjack_sum(player)
 
     print(f'Dealer  {dealer[0]}\n'
           f'Player  {print_cards(player)}  {player_total}{' (soft)' if soft else ''}')
+
+    dealer.append(deck.deal())
     dealer_total, _ = blackjack_sum(dealer)
+
     if dealer_total == 21:
         print('Dealer has blackjack')
         if player_total == 21:
@@ -112,50 +114,66 @@ def main() -> None:
         if player_total == 21:
             print('Player has blackjack')
         else:
+            # don't forget to put cards back
             deck.cards.append(dealer.pop())
 
-            odds_dict = get_odds_dict(dealer, deck)
-            print(odds_dict, sum(odds_dict.values()))
+            odds_dict: dict = get_odds_dict(dealer, deck)
 
-def get_odds_dict(input_cards: list[Card], deck: Deck, space='') -> dict:
-    output_odds: dict = {}
-    next_card_rank: int = 11
-    while next_card_rank > 1:
-        next_card_rank_name: str = Card(next_card_rank).rankName
-        next_card: Card = deck.deal(next_card_rank_name)
-        current_odds: float = (deck.count(next_card_rank_name) + 1)/(len(deck) + 1)
+            queue: list = []
 
-        if next_card:
-            current_cards = input_cards + [next_card]
+            dealer_total, _ = blackjack_sum(dealer)
+            print(f'\nCurrent cards: {dealer}\nCurrent odds: {float(1)}\nTotal: {dealer_total}\n1 Card')
 
-            total, _ = blackjack_sum(current_cards)
+            represent_odds_dict(deck, odds_dict, queue)
 
-            if total < 17:
-                next_odds = get_odds_dict(current_cards, deck, space+'   ')
+            while queue:
+                print(queue[0])
+                total, soft, count, cards, odds = queue[0]
+                print(f'\nCurrent odds: {odds}\nCurrent cards: {cards}\nTotal: {total}\n{len(cards)} Cards')
+                for card in cards[1:]: # make sure these cards aren't in the deck
+                    deck.deal(card.rankName, card.suit)
 
-                # odds of getting both the current card and the one before
-                adjusted_odds: dict = {}
-                for key in next_odds:
-                    adjusted_odds[key] = current_odds * next_odds[key]
+                odds_dict = get_odds_dict(cards, deck)
 
-                for key in adjusted_odds:
-                    if key in output_odds:
-                        output_odds[key] += adjusted_odds[key]
-                    else:
-                        output_odds[key] = adjusted_odds[key]
+                represent_odds_dict(deck, odds_dict, queue)
 
-                # print(current_cards, total, current_odds, next_odds, adjusted_odds, output_odds)
-            elif total <= 21:
-                    output_odds[total] = current_odds
-            else:
-                if 'bust' in output_odds:
-                    output_odds['bust'] += current_odds
-                else:
-                    output_odds['bust'] = current_odds
+                print(queue)
 
-            deck.cards.append(next_card)
-        next_card_rank -= 1
-    return output_odds
+                for card in cards[1:]:
+                    deck.cards.append(card)
+
+                queue.pop(0)
+
+
+def represent_odds_dict(deck, odds_dict, queue):
+    for total in list(range(1, 22)) + ['bust']:
+        if total in odds_dict:
+            soft = odds_dict[total][0]
+            count = odds_dict[total][1]
+            odds = count / len(deck)
+            print(f'{f'{total}{' (soft)' if soft else ''}':<9}  {odds * 100:>2.0f}%')
+            if total != 'bust' and total < 17:
+                queue.append([total, *odds_dict[total], odds])
+
+
+def get_odds_dict(cards, deck):
+    odds_dict = {'bust': [False, 0, None], 22: None}
+    for next_rank in range(11, 1, -1):
+        # have to put this card back
+        next_rank_name = Card(next_rank).rankName
+
+        next_card = deck.deal(next_rank_name)
+        all_cards = cards + [next_card]
+        total, soft = blackjack_sum(all_cards)
+        if total <= 21:
+            odds_dict[total] = [soft, deck.count(next_rank_name) + 1, all_cards]
+        else:
+            odds_dict['bust'][1] += deck.count(next_rank_name) + 1
+
+        deck.cards.append(next_card)
+
+    return odds_dict
+
 
 def blackjack_sum(cards: list[Card]) -> tuple[int, bool]:
     output = 0
@@ -179,7 +197,7 @@ def print_cards(cards: list[Card]) -> str:
     output = ''
     for card in cards:
         output += str(card) + ' '
-    return output[:-1]
+    return output[:-1] 
 
 if __name__ == '__main__':
     main()
